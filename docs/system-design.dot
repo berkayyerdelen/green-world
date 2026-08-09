@@ -1,0 +1,75 @@
+digraph GreenWorld {
+  rankdir=LR;
+  bgcolor="#f7f9fc";
+  fontname="Helvetica";
+  labelloc="t";
+  fontsize=22;
+  label=<<b>GreenWorld — System Design</b>>;
+  nodesep=0.45; ranksep=0.9;
+  node [fontname="Helvetica", fontsize=12, shape=box, style="rounded,filled", penwidth=1.4, margin="0.18,0.12"];
+  edge [fontname="Helvetica", fontsize=10, color="#5b6b7f", penwidth=1.3, arrowsize=0.8];
+
+  /* ---------- Client ---------- */
+  subgraph cluster_client {
+    label="Client"; fontsize=13; color="#c7d2e0"; style="rounded,dashed"; bgcolor="#eef3fa";
+    UI [label=<<b>Live Dashboard</b><br/><font point-size="10">browser · Chart.js<br/>polls every 2s</font>>,
+        fillcolor="#dbe8ff", color="#3b6fd4"];
+  }
+
+  /* ---------- API ---------- */
+  subgraph cluster_api {
+    label="GreenWorld.Api"; fontsize=13; color="#bfe3cf"; style="rounded,dashed"; bgcolor="#edf9f1";
+    CTRL [label=<<b>Controllers</b><br/><font point-size="10">neighbourhood · simulation</font>>, fillcolor="#d6f5e2", color="#2f9e5f"];
+    QS   [label=<<b>NeighbourhoodQueryService</b><br/><font point-size="10">real-time + historical reads</font>>, fillcolor="#d6f5e2", color="#2f9e5f"];
+    CTL  [label=<<b>ISimulationControl</b><br/><font point-size="10">pause · resume · speed</font>>, fillcolor="#eafaf0", color="#2f9e5f"];
+    CTRL -> QS [style=invis];
+  }
+
+  /* ---------- Producer ---------- */
+  subgraph cluster_sim {
+    label="Meter farm (producer)"; fontsize=13; color="#f2d6ad"; style="rounded,dashed"; bgcolor="#fdf4e7";
+    WM   [label=<<b>SeasonalWeatherModel</b><br/><font point-size="10">deterministic temp / cloud / sun</font>>, fillcolor="#ffeccc", color="#d98a1f"];
+    CALC [label=<<b>MeterReadingCalculator</b><br/><font point-size="10">physics per asset</font>>, fillcolor="#ffeccc", color="#d98a1f"];
+    BAT  [label=<<b>Battery + PeakShavingStrategy</b><br/><font point-size="10">charge / discharge control</font>>, fillcolor="#ffeccc", color="#d98a1f"];
+    MS   [label=<<b>MeterSimulatorService</b><br/><font point-size="10">hosted loop · 1 simulated hour/tick</font>>, fillcolor="#ffdfa8", color="#c9781a"];
+    WM -> MS; CALC -> MS; BAT -> MS;
+  }
+
+  /* ---------- Broker ---------- */
+  MQ [label=<<b>RabbitMQ</b><br/><font point-size="10">MassTransit<br/>queue: meter.readings</font>>,
+      shape=box, style="filled", fillcolor="#efe3fb", color="#8a52c9", penwidth=1.6];
+
+  /* ---------- Consumer ---------- */
+  subgraph cluster_ing {
+    label="Ingestion (consumer)"; fontsize=13; color="#b9e3e6"; style="rounded,dashed"; bgcolor="#ecf8f9";
+    CONS   [label=<<b>MeterReadingConsumer</b>>, fillcolor="#d5f2f4", color="#1f9aa6"];
+    INGSVC [label=<<b>MeterReadingIngestionService</b><br/><font point-size="10">append event + update projection</font>>, fillcolor="#d5f2f4", color="#1f9aa6"];
+    CONS -> INGSVC;
+  }
+
+  /* ---------- Database ---------- */
+  subgraph cluster_db {
+    label="PostgreSQL (EF Core)"; fontsize=13; color="#aebfd6"; style="rounded,dashed"; bgcolor="#eaf0f8";
+    EV    [label=<<b>meter_readings</b><br/><font point-size="9">event store · source of truth</font>>, shape=cylinder, fillcolor="#dbe4f3", color="#3457a0"];
+    ASSET [label=<<b>assets</b><br/><font point-size="9">cumulative projection (kWh)</font>>, shape=cylinder, fillcolor="#dbe4f3", color="#3457a0"];
+    SNAP  [label=<<b>aggregate_snapshots</b><br/><font point-size="9">power/energy + battery over time</font>>, shape=cylinder, fillcolor="#dbe4f3", color="#3457a0"];
+  }
+
+  /* ---------- Flows ---------- */
+  UI   -> CTRL [label="HTTP / JSON"];
+  CTRL -> UI   [style=invis];
+  UI   -> CTL  [label="pause / resume / speed", constraint=false, color="#8a52c9"];
+  CTL  -> MS   [label="control", style=dashed];
+
+  MS   -> MQ   [label="publish reading", color="#8a52c9", penwidth=1.6];
+  MQ   -> CONS [label="deliver"];
+
+  INGSVC -> EV    [label="append"];
+  INGSVC -> ASSET [label="+= delta"];
+  MS     -> SNAP  [label="per-tick snapshot", style=dashed, color="#c9781a"];
+
+  ASSET -> QS [label="real-time", dir=back];
+  SNAP  -> QS [label="historical", dir=back];
+  EV    -> QS [label="asset history", dir=back];
+  QS -> CTRL [label="read models"];
+}

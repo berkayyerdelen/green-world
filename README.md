@@ -55,6 +55,10 @@ MeterSimulatorService ──publish──▶ RabbitMQ ──▶ MeterReadingCons
 
 ## System design
 
+![GreenWorld system design](docs/system-design.png)
+
+<details><summary>Same diagram as Mermaid</summary>
+
 ```mermaid
 flowchart LR
     subgraph SIM["Meter farm (producer)"]
@@ -100,6 +104,8 @@ flowchart LR
     UI -- pause / resume / speed --> CTRL
     CTRL -- ISimulationControl --> MS
 ```
+
+</details>
 
 Two write paths land in Postgres: readings flow **meter → RabbitMQ → consumer →
 event store + projection**, while the simulator writes **per-tick aggregate
