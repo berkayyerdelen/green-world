@@ -40,11 +40,11 @@
   <div class="controls">
     <button id="btn-pause">Pause</button>
     <button id="btn-resume">Resume</button>
-    <span class="ctl-label">Speed:</span>
-    <button data-delay="2000">0.5×</button>
-    <button data-delay="1000">1×</button>
-    <button data-delay="250">4×</button>
-    <button data-delay="50">20×</button>
+    <span class="ctl-label">Speed (real time per simulated hour):</span>
+    <button data-delay="2000" title="2s per simulated hour">0.5× · 2s/h</button>
+    <button data-delay="1000" title="1s per simulated hour">1× · 1s/h</button>
+    <button data-delay="250" title="0.25s per simulated hour">4× · 0.25s/h</button>
+    <button data-delay="50" title="50ms per simulated hour">20× · 50ms/h</button>
     <span class="pill" id="ctl-status">—</span>
   </div>
 
@@ -153,7 +153,9 @@ async function tick(){
 // ---- clock controls ----
 async function post(url){ try { const r = await fetch(url,{method:'POST'}); return r.ok ? r.json() : null; } catch { return null; } }
 function renderStatus(s){ if(!s) return;
-  document.getElementById('ctl-status').textContent = (s.isPaused ? 'Paused' : 'Running') + ` · ${s.stepDelayMs}ms/tick`; }
+  const pace = s.stepDelayMs >= 1000 ? `${(s.stepDelayMs/1000).toFixed(2)}s` : `${s.stepDelayMs}ms`;
+  document.getElementById('ctl-status').textContent =
+    (s.isPaused ? 'Paused' : 'Running') + ` · ${pace} of real time per simulated hour`; }
 document.getElementById('btn-pause').onclick  = async () => renderStatus(await post('/api/simulation/pause'));
 document.getElementById('btn-resume').onclick = async () => renderStatus(await post('/api/simulation/resume'));
 document.querySelectorAll('button[data-delay]').forEach(b =>
