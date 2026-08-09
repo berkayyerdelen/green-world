@@ -16,6 +16,7 @@
       <ProjectReference Include="..\GreenWorld.Application\GreenWorld.Application.csproj" />
       <ProjectReference Include="..\GreenWorld.Domain\GreenWorld.Domain.csproj" />
       <ProjectReference Include="..\GreenWorld.Infrastructure\GreenWorld.Infrastructure.csproj" />
+      <ProjectReference Include="..\GreenWorld.SharedKernel\GreenWorld.SharedKernel.csproj" />
     </ItemGroup>
 
 </Project>

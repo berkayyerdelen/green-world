@@ -1,0 +1,14 @@
+{
+  "Name": "GreenWorld",
+  "Seed": 42,
+  "HouseCount": 30,
+  "PublicChargerCount": 6,
+  "PvShare": 0.40,
+  "HeatPumpShare": 0.30,
+  "HomeEvShare": 0.20,
+  "PvCapacityKwp": 4.0,
+  "HomeEvPowerKw": 7.4,
+  "PublicChargerPowerKw": 22.0,
+  "StartUtc": "2025-01-01T00:00:00+00:00",
+  "StepMinutes": 60
+}
