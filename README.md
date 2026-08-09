@@ -53,6 +53,60 @@ MeterSimulatorService ──publish──▶ RabbitMQ ──▶ MeterReadingCons
 - **Real-time reads** come from the O(1) projections; **historical reads** come
   from the aggregate snapshot series and the raw event store.
 
+## System design
+
+```mermaid
+flowchart LR
+    subgraph SIM["Meter farm (producer)"]
+        MS["MeterSimulatorService<br/>(weather-driven readings)"]
+        WM["SeasonalWeatherModel"]
+        CALC["MeterReadingCalculator<br/>(physics per asset)"]
+        BAT["Battery + PeakShavingStrategy"]
+        WM --> MS
+        CALC --> MS
+        BAT --> MS
+    end
+
+    MQ(["RabbitMQ queue<br/>meter.readings"])
+    MS -- "publish MeterReadingMessage<br/>(MassTransit)" --> MQ
+
+    subgraph ING["Ingestion (consumer)"]
+        CONS["MeterReadingConsumer"]
+        INGSVC["MeterReadingIngestionService<br/>append event + update projection"]
+        CONS --> INGSVC
+    end
+    MQ -- deliver --> CONS
+
+    subgraph DB[("PostgreSQL — EF Core")]
+        EV["meter_readings<br/>(event store · source of truth)"]
+        ASSET["assets<br/>(cumulative projection)"]
+        SNAP["aggregate_snapshots<br/>(power/energy + battery over time)"]
+    end
+    INGSVC -- append --> EV
+    INGSVC -- "+= delta" --> ASSET
+    MS -- per-tick snapshot --> SNAP
+
+    subgraph API["GreenWorld.Api"]
+        QS["NeighbourhoodQueryService"]
+        CTRL["Controllers<br/>neighbourhood · simulation"]
+        QS --> CTRL
+    end
+    ASSET -- real-time --> QS
+    SNAP -- historical --> QS
+    EV -- asset history --> QS
+
+    UI["Live dashboard<br/>(polls every 2s · Chart.js)"]
+    CTRL -- JSON --> UI
+    UI -- "pause / resume / speed" --> CTRL
+    CTRL -- ISimulationControl --> MS
+```
+
+Two write paths land in Postgres: readings flow **meter → RabbitMQ → consumer →
+event store + projection**, while the simulator writes **per-tick aggregate
+snapshots** (including battery power/SoC/net-load-with-battery) directly. Reads are
+served from the fast projections (real-time) and the snapshot series + event store
+(historical).
+
 ## Solution layout
 
 ```
@@ -226,17 +280,14 @@ as it gets colder, energy = power × step) and the asset projection
 
 ## Known limitations & what I'd improve next
 
-- **PV netting is aggregate-only.** Self-consumption/export is computed at the
-  neighbourhood level, not per-house, and there's no battery storage or
-  inter-house energy sharing. Next: per-meter import/export registers and a
-  simple home-battery asset.
+- **PV/battery netting is aggregate-only.** Self-consumption/export and battery
+  peak shaving are computed at the neighbourhood level, not per-house, and there's
+  no inter-house energy sharing. Next: per-meter import/export registers and
+  per-house batteries.
 - **No cooling load.** Heat pumps model heating only; summer A/C demand is absent.
 - **"Reset" isn't exposed.** The clock can be paused/resumed/sped up, but there's
   no destructive reset (the event store is append-only). Next: a reset command
   that truncates readings/snapshots and zeroes projections.
-- **The 24-hour chart shows more than 24h.** It plots the last N snapshots
-  (configurable); a fixed rolling-24-simulated-hour window would match the brief
-  more literally.
 - **Hand-authored EF migration/snapshot.** Authored to match the model (the EF
   tooling wasn't run in this environment), so EF 10's `PendingModelChangesWarning`
   is suppressed. Next: regenerate with `dotnet ef` and drop the suppression.
@@ -247,3 +298,42 @@ as it gets colder, energy = power × step) and the asset projection
   idempotent against duplicates; next would be a uniqueness guard / inbox pattern.
 - **Not verified end-to-end in this environment** (no .NET SDK/Docker available
   here) — correctness rests on the unit tests and code review.
+
+## Scaling notes
+
+The *architecture* is built for scale (event store as source of truth + fast
+projections for reads, a real message broker), but the current *implementation* is
+deliberately tuned for clarity over throughput. What holds up, what breaks first,
+and the targeted fixes:
+
+**Holds up.** Clean layering and the CQRS-style read/write split mean reads never
+replay events; the physics is deterministic and stateless (parallelises trivially);
+MassTransit/RabbitMQ already gives competing consumers, retries and back-pressure;
+and in production the meters replace the built-in simulator, so its single loop is
+irrelevant to scale.
+
+**Breaks first — and the fix.**
+
+1. **Ingestion write path.** Each message opens its own `DbContext` and does
+   *load asset → mutate → SaveChanges* (two round trips per reading). Replace with
+   an atomic `UPDATE assets SET cumulative_… = cumulative_… + @delta` (one round
+   trip, concurrency-safe) and batch the event-store inserts.
+2. **Per-asset ordering under competing consumers.** Cumulative `+=` is commutative
+   (safe), but `LastPowerKw`/`LastReadingAt` can go backwards. Partition the queue
+   by `AssetId` to preserve per-asset order and guard "last" fields with a
+   max-timestamp check.
+3. **Idempotency.** At-least-once delivery + no dedup double-counts on redelivery.
+   Add a unique constraint on `ReadingId` / an inbox pattern.
+4. **Time-series growth.** The append-only readings and per-tick snapshots grow
+   unbounded on a single node. Move to TimescaleDB hypertables + continuous
+   aggregates (or partitioning + retention).
+5. **Read/UI load.** The dashboard polls four endpoints every 2s and reloads the
+   whole neighbourhood graph each time. Cache the read models, pre-aggregate, and
+   push updates via SignalR/WebSocket instead of polling.
+6. **Aggregate snapshots computed in the producer.** In a real system this belongs
+   in a stream processor windowing over ingested events, per neighbourhood.
+
+Net: going from one neighbourhood to tens of thousands of meters keeps the domain
+and messaging, and swaps the *projection write path* (atomic increments +
+partitioning + idempotency + batching) and the *storage/read path* (time-series DB
++ cache + push) — targeted changes, not a rewrite.
