@@ -70,8 +70,16 @@ publisher/consumer and ingestion.)
 
 ## Run
 
+Whole stack in containers (API + PostgreSQL + RabbitMQ):
+
 ```bash
-docker compose up -d           # PostgreSQL + RabbitMQ (management UI on :15672)
+docker compose up --build      # dashboard at http://localhost:8080/
+```
+
+Or run just the infrastructure and the API from your IDE / CLI:
+
+```bash
+docker compose up -d postgres rabbitmq   # RabbitMQ management UI on :15672
 dotnet run --project GreenWorld.Api
 ```
 
@@ -79,7 +87,8 @@ On startup the API **applies EF migrations** and **seeds the neighbourhood once*
 (30 households + 6 public facilities). The simulator then begins publishing
 readings; watch the meters and aggregate move.
 
-- **Live dashboard:** `http://localhost:5000/` (or your https port) — a self-contained
+- **Live dashboard:** `http://localhost:8080/` in Docker (or your dev port when running
+  the API directly) — a self-contained
   page that polls the API every 2s and charts aggregate consumption/generation/net
   power over time plus a live cumulative-per-meter table (Chart.js from CDN).
 - **Swagger UI:** `/swagger`.
