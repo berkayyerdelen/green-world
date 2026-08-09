@@ -75,9 +75,14 @@ docker compose up -d           # PostgreSQL + RabbitMQ (management UI on :15672)
 dotnet run --project GreenWorld.Api
 ```
 
-On startup the API ensures the schema and **seeds the neighbourhood once**
+On startup the API **applies EF migrations** and **seeds the neighbourhood once**
 (30 households + 6 public facilities). The simulator then begins publishing
-readings; watch the meters and aggregate move. Swagger UI is at `/swagger`.
+readings; watch the meters and aggregate move.
+
+- **Live dashboard:** `http://localhost:5000/` (or your https port) — a self-contained
+  page that polls the API every 2s and charts aggregate consumption/generation/net
+  power over time plus a live cumulative-per-meter table (Chart.js from CDN).
+- **Swagger UI:** `/swagger`.
 
 ### API
 
@@ -159,9 +164,17 @@ Assets are assigned by independent seeded draws against the shares, so a given
 seed + config always builds the identical neighbourhood (identities included).
 
 ## Persistence notes
-Startup uses `EnsureCreated` for zero-friction bring-up. For production, add EF
-migrations (`dotnet ef migrations add Initial -p GreenWorld.Infrastructure -s
-GreenWorld.Api`) and switch the initializer to `Database.Migrate()`.
+The schema is managed by **EF Core migrations** (`Infrastructure/Persistence/Migrations`);
+`DatabaseInitializer` calls `Database.Migrate()` on startup. A
+`DesignTimeDbContextFactory` lets the EF tooling run without the web host:
+
+```bash
+dotnet ef migrations add <Name> -p GreenWorld.Infrastructure -s GreenWorld.Api
+dotnet ef database update       -p GreenWorld.Infrastructure -s GreenWorld.Api
+```
+
+The initial migration was authored to match the model; if you prefer, delete it
+and regenerate with the command above.
 
 ## Tests
 Domain tests cover the physics (PV ∝ irradiance and zero at night, heat pump rises

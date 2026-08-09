@@ -6,9 +6,8 @@ using Microsoft.EntityFrameworkCore;
 namespace GreenWorld.Infrastructure.Persistence;
 
 /// <summary>
-/// Ensures the schema exists and the neighbourhood is seeded once. Uses
-/// EnsureCreated for zero-friction startup; swap for db.Database.Migrate() once
-/// EF migrations are added.
+/// Applies EF migrations (creating the schema if needed) and seeds the
+/// neighbourhood once.
 /// </summary>
 public sealed class DatabaseInitializer
 {
@@ -28,7 +27,7 @@ public sealed class DatabaseInitializer
 
     public async Task InitialiseAsync(CancellationToken ct = default)
     {
-        await _db.Database.EnsureCreatedAsync(ct);
+        await _db.Database.MigrateAsync(ct);
 
         if (await _neighbourhoods.ExistsAnyAsync(ct)) return;
 

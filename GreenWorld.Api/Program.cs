@@ -24,5 +24,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseDefaultFiles();   // serve wwwroot/index.html at /
+app.UseStaticFiles();    // live dashboard
 app.MapControllers();
 app.Run();
