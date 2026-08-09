@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace GreenWorld.Infrastructure.Persistence;
 
@@ -16,6 +17,7 @@ public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<Gre
                    ?? "Host=localhost;Port=5432;Database=greenworld;Username=greenworld;Password=greenworld";
         var options = new DbContextOptionsBuilder<GreenWorldDbContext>()
             .UseNpgsql(conn)
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
         return new GreenWorldDbContext(options);
     }

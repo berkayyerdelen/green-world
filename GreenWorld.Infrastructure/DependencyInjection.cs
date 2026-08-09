@@ -10,6 +10,7 @@ using GreenWorld.Infrastructure.Simulation;
 using GreenWorld.Infrastructure.Weather;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -35,7 +36,10 @@ public static class DependencyInjection
 
         // EF Core + PostgreSQL.
         services.AddDbContext<GreenWorldDbContext>(o =>
-            o.UseNpgsql(configuration.GetConnectionString("Postgres")));
+            o.UseNpgsql(configuration.GetConnectionString("Postgres"))
+             // Initial migration + snapshot were authored by hand; suppress EF 10's
+             // strict snapshot-vs-model check so Migrate() applies the migration.
+             .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
 
         // Repositories / stores.
         services.AddScoped<INeighbourhoodRepository, EfNeighbourhoodRepository>();
