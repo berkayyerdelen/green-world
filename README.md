@@ -58,46 +58,46 @@ MeterSimulatorService ──publish──▶ RabbitMQ ──▶ MeterReadingCons
 ```mermaid
 flowchart LR
     subgraph SIM["Meter farm (producer)"]
-        MS["MeterSimulatorService<br/>(weather-driven readings)"]
         WM["SeasonalWeatherModel"]
-        CALC["MeterReadingCalculator<br/>(physics per asset)"]
+        CALC["MeterReadingCalculator (physics per asset)"]
         BAT["Battery + PeakShavingStrategy"]
+        MS["MeterSimulatorService"]
         WM --> MS
         CALC --> MS
         BAT --> MS
     end
 
-    MQ(["RabbitMQ queue<br/>meter.readings"])
-    MS -- "publish MeterReadingMessage<br/>(MassTransit)" --> MQ
+    MQ(["RabbitMQ queue: meter.readings"])
+    MS -- publish reading via MassTransit --> MQ
 
     subgraph ING["Ingestion (consumer)"]
         CONS["MeterReadingConsumer"]
-        INGSVC["MeterReadingIngestionService<br/>append event + update projection"]
+        INGSVC["MeterReadingIngestionService"]
         CONS --> INGSVC
     end
     MQ -- deliver --> CONS
 
-    subgraph DB[("PostgreSQL — EF Core")]
-        EV["meter_readings<br/>(event store · source of truth)"]
-        ASSET["assets<br/>(cumulative projection)"]
-        SNAP["aggregate_snapshots<br/>(power/energy + battery over time)"]
+    subgraph DB["PostgreSQL (EF Core)"]
+        EV[("meter_readings: event store")]
+        ASSET[("assets: cumulative projection")]
+        SNAP[("aggregate_snapshots: power/energy + battery")]
     end
-    INGSVC -- append --> EV
-    INGSVC -- "+= delta" --> ASSET
+    INGSVC -- append event --> EV
+    INGSVC -- increment projection --> ASSET
     MS -- per-tick snapshot --> SNAP
 
     subgraph API["GreenWorld.Api"]
         QS["NeighbourhoodQueryService"]
-        CTRL["Controllers<br/>neighbourhood · simulation"]
+        CTRL["Controllers: neighbourhood + simulation"]
         QS --> CTRL
     end
     ASSET -- real-time --> QS
     SNAP -- historical --> QS
     EV -- asset history --> QS
 
-    UI["Live dashboard<br/>(polls every 2s · Chart.js)"]
+    UI["Live dashboard (polls every 2s, Chart.js)"]
     CTRL -- JSON --> UI
-    UI -- "pause / resume / speed" --> CTRL
+    UI -- pause / resume / speed --> CTRL
     CTRL -- ISimulationControl --> MS
 ```
 
