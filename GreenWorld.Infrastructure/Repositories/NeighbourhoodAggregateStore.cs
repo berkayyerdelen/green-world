@@ -5,10 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GreenWorld.Infrastructure.Repositories;
 
-public sealed class EfNeighbourhoodAggregateStore : INeighbourhoodAggregateStore
+public sealed class NeighbourhoodAggregateStore : INeighbourhoodAggregateStore
 {
     private readonly GreenWorldDbContext _db;
-    public EfNeighbourhoodAggregateStore(GreenWorldDbContext db) => _db = db;
+    public NeighbourhoodAggregateStore(GreenWorldDbContext db) => _db = db;
 
     public async Task AddAsync(NeighbourhoodAggregateSnapshot snapshot, CancellationToken ct = default)
     {

@@ -48,9 +48,9 @@ public static class DependencyInjection
 
         // Repositories / stores.
         services.AddScoped<INeighbourhoodRepository, NeighbourhoodRepository>();
-        services.AddScoped<IAssetRepository, EfAssetRepository>();
-        services.AddScoped<IMeterReadingEventStore, EfMeterReadingEventStore>();
-        services.AddScoped<INeighbourhoodAggregateStore, EfNeighbourhoodAggregateStore>();
+        services.AddScoped<IAssetRepository, AssetRepository>();
+        services.AddScoped<IMeterReadingEventStore, MeterReadingEventStore>();
+        services.AddScoped<INeighbourhoodAggregateStore, NeighbourhoodAggregateStore>();
         services.AddScoped<DatabaseInitializer>();
 
         // Deterministic domain services.

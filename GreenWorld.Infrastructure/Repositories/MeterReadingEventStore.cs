@@ -5,10 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GreenWorld.Infrastructure.Repositories;
 
-public sealed class EfMeterReadingEventStore : IMeterReadingEventStore
+public sealed class MeterReadingEventStore : IMeterReadingEventStore
 {
     private readonly GreenWorldDbContext _db;
-    public EfMeterReadingEventStore(GreenWorldDbContext db) => _db = db;
+    public MeterReadingEventStore(GreenWorldDbContext db) => _db = db;
 
     /// <summary>Adds to the context; persisted by the caller's unit of work.</summary>
     public async Task AppendAsync(MeterReadingEvent reading, CancellationToken ct = default)
