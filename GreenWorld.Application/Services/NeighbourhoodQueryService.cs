@@ -28,21 +28,21 @@ public sealed class NeighbourhoodQueryService : INeighbourhoodQueryService
 
     public async Task<NeighbourhoodResponse> GetNeighbourhoodAsync(CancellationToken ct = default)
     {
-        var n = await Load(ct);
-        var sites = n.Sites.Select(s => new SiteDto(
+        var neighbourhood = await Load(ct);
+        var sites = neighbourhood.Sites.Select(s => new SiteDto(
             s.Id, s.Name, s.SiteType.ToString(),
             s.CumulativeConsumedKwh, s.CumulativeGeneratedKwh,
             s.Assets.Select(ToAssetDto).ToList())).ToList();
 
         return new NeighbourhoodResponse(
-            n.Id, n.Name, n.SimulationStart,
-            n.Households.Count(), n.PublicFacilities.Count(), sites);
+            neighbourhood.Id, neighbourhood.Name, neighbourhood.SimulationStart,
+            neighbourhood.Households.Count(), neighbourhood.PublicFacilities.Count(), sites);
     }
 
     public async Task<MetersResponse> GetMetersAsync(CancellationToken ct = default)
     {
-        var n = await Load(ct);
-        var meters = n.Sites
+        var neighbourhood = await Load(ct);
+        var meters = neighbourhood.Sites
             .SelectMany(s => s.Assets.Select(a => new MeterDto(
                 a.Id, a.Name, a.Kind.ToString(), a.Direction.ToString(), s.Id,
                 a.CumulativeConsumedKwh, a.CumulativeGeneratedKwh, a.LastReadingAt)))
@@ -54,10 +54,10 @@ public sealed class NeighbourhoodQueryService : INeighbourhoodQueryService
 
     public async Task<AggregateStateResponse> GetAggregateStateAsync(CancellationToken ct = default)
     {
-        var n = await Load(ct);
-        var latest = await _aggregates.GetLatestAsync(n.Id, ct);
+        var neighbourhood = await Load(ct);
+        var latest = await _aggregates.GetLatestAsync(neighbourhood.Id, ct);
         return new AggregateStateResponse(
-            n.Id, latest?.At,
+            neighbourhood.Id, latest?.At,
             latest?.Season.ToString(),
             latest?.TemperatureCelsius ?? 0,
             latest?.CloudCover ?? 0,
@@ -65,8 +65,8 @@ public sealed class NeighbourhoodQueryService : INeighbourhoodQueryService
             latest?.TotalConsumptionKw ?? 0,
             latest?.TotalGenerationKw ?? 0,
             latest?.NetKw ?? 0,
-            n.AllAssets().Sum(a => a.CumulativeConsumedKwh),
-            n.AllAssets().Sum(a => a.CumulativeGeneratedKwh));
+            neighbourhood.AllAssets().Sum(a => a.CumulativeConsumedKwh),
+            neighbourhood.AllAssets().Sum(a => a.CumulativeGeneratedKwh));
     }
 
     public async Task<AggregateHistoryResponse> GetAggregateHistoryAsync(

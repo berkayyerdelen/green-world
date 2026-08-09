@@ -30,6 +30,7 @@
     border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
   .controls button:hover { background:#2b3c4a; }
   .ctl-label { color:var(--muted); font-size:12px; margin-left:8px; }
+  .controls button.active { background:#2f6fed; border-color:#2f6fed; color:#fff; }
 </style>
 </head>
 <body>
@@ -58,6 +59,14 @@
     <div class="card kpi"><div class="label">Cumulative generated</div><div class="val" id="k-cg">—</div></div>
   </div>
 
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span class="ctl-label" style="margin:0">Chart window:</span>
+    <div class="controls" id="range-controls" style="margin:0">
+      <button data-last="24" class="active">Last 24h</button>
+      <button data-last="168">7 days</button>
+      <button data-last="0">All</button>
+    </div>
+  </div>
   <div class="chart-wrap"><canvas id="chart"></canvas></div>
 
   <div class="card">
@@ -92,11 +101,23 @@ const chart = new Chart(ctx, {
 
 async function j(url){ const r = await fetch(url); if(!r.ok) throw new Error(url+' '+r.status); return r.json(); }
 
+// Chart window in simulated hours (step is 1h, so last=N ⇒ N simulated hours). 0 = all.
+let historyLast = 24;
+document.querySelectorAll('#range-controls button').forEach(b => b.onclick = () => {
+  historyLast = parseInt(b.dataset.last, 10);
+  document.querySelectorAll('#range-controls button').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  tick();
+});
+
 async function tick(){
   try {
+    const histUrl = historyLast > 0
+      ? `/api/neighbourhood/aggregate/history?last=${historyLast}`
+      : `/api/neighbourhood/aggregate/history`;
     const [nb, agg, hist, meters] = await Promise.all([
       j('/api/neighbourhood'), j('/api/neighbourhood/aggregate'),
-      j('/api/neighbourhood/aggregate/history?last=240'), j('/api/neighbourhood/meters')
+      j(histUrl), j('/api/neighbourhood/meters')
     ]);
 
     document.getElementById('meta').textContent =
