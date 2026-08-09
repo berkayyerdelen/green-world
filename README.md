@@ -73,7 +73,7 @@ publisher/consumer and ingestion.)
 Whole stack in containers (API + PostgreSQL + RabbitMQ):
 
 ```bash
-docker compose up --build      # dashboard at http://localhost:8080/
+docker compose up --build      # dashboard at http://localhost:8088/
 ```
 
 Or run just the infrastructure and the API from your IDE / CLI:
@@ -87,7 +87,7 @@ On startup the API **applies EF migrations** and **seeds the neighbourhood once*
 (30 households + 6 public facilities). The simulator then begins publishing
 readings; watch the meters and aggregate move.
 
-- **Live dashboard:** `http://localhost:8080/` in Docker (or your dev port when running
+- **Live dashboard:** `http://localhost:8088/` in Docker (or your dev port when running
   the API directly) — a self-contained
   page that polls the API every 2s and charts aggregate consumption/generation/net
   power over time plus a live cumulative-per-meter table (Chart.js from CDN).
@@ -99,10 +99,18 @@ readings; watch the meters and aggregate move.
 |---|---|
 | `GET  /api/neighbourhood` | Structure: sites + assets with cumulative energy |
 | `GET  /api/neighbourhood/meters` | Cumulative kWh per asset/meter since start |
-| `GET  /api/neighbourhood/aggregate` | Latest aggregate power + cumulative energy (real time) |
+| `GET  /api/neighbourhood/aggregate` | Latest aggregate power + cumulative energy + weather/season (real time) |
 | `GET  /api/neighbourhood/aggregate/history?from&to&last=N` | Aggregate power/energy over time |
 | `GET  /api/neighbourhood/assets/{id}/history` | Raw reading stream for one asset |
 | `POST /api/meterreadings` | Publish a reading onto the same pipeline (testing) |
+| `GET  /api/simulation/status` | Clock state: paused? and pace (ms/tick) |
+| `POST /api/simulation/pause` · `/resume` | Pause / resume the simulation clock |
+| `POST /api/simulation/speed?delayMs=N` | Change the pace (wall-clock ms per simulated tick) |
+
+The dashboard surfaces the current simulated time, **season and weather**
+(temperature, cloud, irradiance), live consumption/generation/net power, the
+aggregate chart, the per-meter cumulative table, and **pause/resume/speed**
+controls wired to the endpoints above.
 
 ## Design decisions & assumptions
 
@@ -190,3 +198,27 @@ Domain tests cover the physics (PV ∝ irradiance and zero at night, heat pump r
 as it gets colder, energy = power × step) and the asset projection
 (`ApplyReading` accrual + ownership guard). Application tests cover ingestion
 (event appended + projection updated) with in-memory fakes — no infra required.
+
+## Known limitations & what I'd improve next
+
+- **PV netting is aggregate-only.** Self-consumption/export is computed at the
+  neighbourhood level, not per-house, and there's no battery storage or
+  inter-house energy sharing. Next: per-meter import/export registers and a
+  simple home-battery asset.
+- **No cooling load.** Heat pumps model heating only; summer A/C demand is absent.
+- **"Reset" isn't exposed.** The clock can be paused/resumed/sped up, but there's
+  no destructive reset (the event store is append-only). Next: a reset command
+  that truncates readings/snapshots and zeroes projections.
+- **The 24-hour chart shows more than 24h.** It plots the last N snapshots
+  (configurable); a fixed rolling-24-simulated-hour window would match the brief
+  more literally.
+- **Hand-authored EF migration/snapshot.** Authored to match the model (the EF
+  tooling wasn't run in this environment), so EF 10's `PendingModelChangesWarning`
+  is suppressed. Next: regenerate with `dotnet ef` and drop the suppression.
+- **Physics is intentionally simple.** Deterministic profiles + a coarse weather
+  model, not calibrated load/PV curves. Next: richer stochastic occupancy, real
+  irradiance/temperature correlations, and validation against reference data.
+- **At-least-once delivery.** Readings carry a `ReadingId` but ingestion isn't yet
+  idempotent against duplicates; next would be a uniqueness guard / inbox pattern.
+- **Not verified end-to-end in this environment** (no .NET SDK/Docker available
+  here) — correctness rests on the unit tests and code review.

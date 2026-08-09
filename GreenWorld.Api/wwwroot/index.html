@@ -25,14 +25,32 @@
   td.num { text-align:right; font-variant-numeric:tabular-nums; }
   .pill { font-size:11px; padding:2px 8px; border-radius:999px; background:#22303c; color:var(--muted); }
   .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  .controls { display:flex; align-items:center; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .controls button { background:#22303c; color:var(--ink); border:1px solid var(--line);
+    border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  .controls button:hover { background:#2b3c4a; }
+  .ctl-label { color:var(--muted); font-size:12px; margin-left:8px; }
 </style>
 </head>
 <body>
   <h1>GreenWorld — Live Neighbourhood Energy</h1>
   <div class="sub" id="meta">Connecting…</div>
 
+  <div class="controls">
+    <button id="btn-pause">Pause</button>
+    <button id="btn-resume">Resume</button>
+    <span class="ctl-label">Speed:</span>
+    <button data-delay="2000">0.5×</button>
+    <button data-delay="1000">1×</button>
+    <button data-delay="250">4×</button>
+    <button data-delay="50">20×</button>
+    <span class="pill" id="ctl-status">—</span>
+  </div>
+
   <div class="grid">
     <div class="card kpi"><div class="label">Simulated time</div><div class="val" id="k-time">—</div></div>
+    <div class="card kpi"><div class="label">Season</div><div class="val" id="k-season">—</div></div>
+    <div class="card kpi"><div class="label">Weather</div><div class="val" id="k-weather" style="font-size:18px">—</div></div>
     <div class="card kpi"><div class="label">Consumption</div><div class="val cons" id="k-cons">—</div></div>
     <div class="card kpi"><div class="label">Generation</div><div class="val gen" id="k-gen">—</div></div>
     <div class="card kpi"><div class="label">Net</div><div class="val net" id="k-net">—</div></div>
@@ -84,6 +102,9 @@ async function tick(){
     document.getElementById('meta').textContent =
       `${nb.name} · ${nb.householdCount} households · ${nb.publicFacilityCount} public facilities · start ${timeFmt(nb.simulationStart)}`;
     document.getElementById('k-time').textContent = timeFmt(agg.at);
+    document.getElementById('k-season').textContent = agg.season ?? '—';
+    document.getElementById('k-weather').textContent =
+      `${fmt(agg.temperatureCelsius,1)}°C · cloud ${Math.round(agg.cloudCover*100)}% · sun ${Math.round(agg.irradianceFactor*100)}%`;
     document.getElementById('k-cons').textContent = fmt(agg.totalConsumptionKw)+' kW';
     document.getElementById('k-gen').textContent  = fmt(agg.totalGenerationKw)+' kW';
     document.getElementById('k-net').textContent  = fmt(agg.netKw)+' kW';
@@ -107,7 +128,18 @@ async function tick(){
     document.getElementById('meters').innerHTML = rows;
   } catch(e){ document.getElementById('meta').textContent = 'Waiting for simulator… ('+e.message+')'; }
 }
+// ---- clock controls ----
+async function post(url){ try { const r = await fetch(url,{method:'POST'}); return r.ok ? r.json() : null; } catch { return null; } }
+function renderStatus(s){ if(!s) return;
+  document.getElementById('ctl-status').textContent = (s.isPaused ? 'Paused' : 'Running') + ` · ${s.stepDelayMs}ms/tick`; }
+document.getElementById('btn-pause').onclick  = async () => renderStatus(await post('/api/simulation/pause'));
+document.getElementById('btn-resume').onclick = async () => renderStatus(await post('/api/simulation/resume'));
+document.querySelectorAll('button[data-delay]').forEach(b =>
+  b.onclick = async () => renderStatus(await post('/api/simulation/speed?delayMs='+b.dataset.delay)));
+async function pollStatus(){ try { renderStatus(await (await fetch('/api/simulation/status')).json()); } catch {} }
+
 tick(); setInterval(tick, 2000);
+pollStatus(); setInterval(pollStatus, 3000);
 </script>
 </body>
 </html>

@@ -2,6 +2,8 @@ namespace GreenWorld.Application.Responses;
 
 public sealed record AggregatePointDto(
     DateTimeOffset At,
+    string Season,
+    double TemperatureCelsius,
     double TotalConsumptionKw,
     double TotalGenerationKw,
     double NetKw,

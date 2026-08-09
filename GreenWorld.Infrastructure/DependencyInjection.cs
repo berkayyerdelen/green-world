@@ -1,4 +1,5 @@
 using GreenWorld.Application.Contracts;
+using GreenWorld.Application.Services;
 using GreenWorld.Domain.Policies.Contracts;
 using GreenWorld.Domain.Repositories;
 using GreenWorld.Domain.Services;
@@ -33,6 +34,10 @@ public static class DependencyInjection
 
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
         services.Configure<SimulatorOptions>(configuration.GetSection(SimulatorOptions.SectionName));
+
+        // Runtime clock control (pause/resume/speed), seeded from the configured pace.
+        services.AddSingleton<ISimulationControl>(sp =>
+            new SimulationControl(sp.GetRequiredService<IOptions<SimulatorOptions>>().Value.StepDelayMs));
 
         // EF Core + PostgreSQL.
         services.AddDbContext<GreenWorldDbContext>(o =>

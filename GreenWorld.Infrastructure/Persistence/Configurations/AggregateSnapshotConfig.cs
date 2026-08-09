@@ -10,6 +10,7 @@ public sealed class AggregateSnapshotConfig : IEntityTypeConfiguration<Neighbour
     {
         b.ToTable("neighbourhood_aggregate_snapshots");
         b.HasKey(x => x.Id);
+        b.Property(x => x.Season).HasConversion<string>().HasMaxLength(20);
         b.HasIndex(x => new { x.NeighbourhoodId, x.At });
         b.Ignore(x => x.NetKw);
     }

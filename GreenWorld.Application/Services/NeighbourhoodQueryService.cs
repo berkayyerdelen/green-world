@@ -58,6 +58,10 @@ public sealed class NeighbourhoodQueryService : INeighbourhoodQueryService
         var latest = await _aggregates.GetLatestAsync(n.Id, ct);
         return new AggregateStateResponse(
             n.Id, latest?.At,
+            latest?.Season.ToString(),
+            latest?.TemperatureCelsius ?? 0,
+            latest?.CloudCover ?? 0,
+            latest?.IrradianceFactor ?? 0,
             latest?.TotalConsumptionKw ?? 0,
             latest?.TotalGenerationKw ?? 0,
             latest?.NetKw ?? 0,
@@ -71,7 +75,8 @@ public sealed class NeighbourhoodQueryService : INeighbourhoodQueryService
         var n = await Load(ct);
         var points = await _aggregates.GetRangeAsync(n.Id, from, to, lastN, ct);
         var dtos = points.Select(p => new AggregatePointDto(
-            p.At, p.TotalConsumptionKw, p.TotalGenerationKw, p.NetKw,
+            p.At, p.Season.ToString(), p.TemperatureCelsius,
+            p.TotalConsumptionKw, p.TotalGenerationKw, p.NetKw,
             p.CumulativeConsumedKwh, p.CumulativeGeneratedKwh)).ToList();
         return new AggregateHistoryResponse(dtos.Count, dtos);
     }

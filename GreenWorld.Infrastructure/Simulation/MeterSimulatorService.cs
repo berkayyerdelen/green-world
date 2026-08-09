@@ -27,6 +27,7 @@ public sealed class MeterSimulatorService : BackgroundService
     private readonly MeterReadingCalculator _calculator;
     private readonly NeighbourhoodConfiguration _config;
     private readonly SimulatorOptions _options;
+    private readonly ISimulationControl _control;
     private readonly ILogger<MeterSimulatorService> _logger;
 
     public MeterSimulatorService(
@@ -36,6 +37,7 @@ public sealed class MeterSimulatorService : BackgroundService
         MeterReadingCalculator calculator,
         NeighbourhoodConfiguration config,
         IOptions<SimulatorOptions> options,
+        ISimulationControl control,
         ILogger<MeterSimulatorService> logger)
     {
         _scopeFactory = scopeFactory;
@@ -44,6 +46,7 @@ public sealed class MeterSimulatorService : BackgroundService
         _calculator = calculator;
         _config = config;
         _options = options.Value;
+        _control = control;
         _logger = logger;
     }
 
@@ -74,6 +77,13 @@ public sealed class MeterSimulatorService : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            // Honour the runtime pause switch without advancing the clock.
+            if (_control.IsPaused)
+            {
+                await Task.Delay(200, stoppingToken);
+                continue;
+            }
+
             var now = clock.Current;
             var ctx = new SimulationContext(now, now.SeasonOf(), _weather.WeatherAt(now), _config.Step);
             double tickConsumptionKw = 0, tickGenerationKw = 0;
@@ -95,6 +105,7 @@ public sealed class MeterSimulatorService : BackgroundService
             cumulativeGenerated += tickGenerationKw * ctx.StepHours;
             await WriteSnapshotAsync(new NeighbourhoodAggregateSnapshot(
                 Guid.NewGuid(), neighbourhood.Id, now,
+                ctx.Season, ctx.Weather.TemperatureCelsius, ctx.Weather.CloudCover, ctx.Weather.IrradianceFactor,
                 tickConsumptionKw, tickGenerationKw, cumulativeConsumed, cumulativeGenerated),
                 stoppingToken);
 
@@ -106,7 +117,7 @@ public sealed class MeterSimulatorService : BackgroundService
                 break;
             }
 
-            await Task.Delay(_options.StepDelayMs, stoppingToken);
+            await Task.Delay(_control.StepDelayMs, stoppingToken);
         }
     }
 
