@@ -17,11 +17,9 @@ using (var scope = app.Services.CreateScope())
     await initializer.InitialiseAsync();
 }
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Swagger enabled in all environments so it's reachable in the container too.
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 app.UseDefaultFiles();   // serve wwwroot/index.html at /
