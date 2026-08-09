@@ -1,7 +1,7 @@
 using GreenWorld.Application.Contracts;
 using GreenWorld.Application.Responses;
-using GreenWorld.Domain.Models.Sites;
 using GreenWorld.Domain.Repositories;
+using GreenWorld.SharedKernel.Configurations;
 
 namespace GreenWorld.Application.Services;
 
@@ -15,15 +15,18 @@ public sealed class NeighbourhoodQueryService : INeighbourhoodQueryService
     private readonly INeighbourhoodRepository _neighbourhoods;
     private readonly INeighbourhoodAggregateStore _aggregates;
     private readonly IMeterReadingEventStore _events;
+    private readonly NeighbourhoodConfiguration _config;
 
     public NeighbourhoodQueryService(
         INeighbourhoodRepository neighbourhoods,
         INeighbourhoodAggregateStore aggregates,
-        IMeterReadingEventStore events)
+        IMeterReadingEventStore events,
+        NeighbourhoodConfiguration config)
     {
         _neighbourhoods = neighbourhoods;
         _aggregates = aggregates;
         _events = events;
+        _config = config;
     }
 
     public async Task<NeighbourhoodResponse> GetNeighbourhoodAsync(CancellationToken ct = default)
@@ -56,6 +59,8 @@ public sealed class NeighbourhoodQueryService : INeighbourhoodQueryService
     {
         var neighbourhood = await Load(ct);
         var latest = await _aggregates.GetLatestAsync(neighbourhood.Id, ct);
+        var capacity = _config.BatteryCapacityKwh;
+        var soc = latest?.BatterySocKwh ?? 0;
         return new AggregateStateResponse(
             neighbourhood.Id, latest?.At,
             latest?.Season.ToString(),
@@ -66,7 +71,15 @@ public sealed class NeighbourhoodQueryService : INeighbourhoodQueryService
             latest?.TotalGenerationKw ?? 0,
             latest?.NetKw ?? 0,
             neighbourhood.AllAssets().Sum(a => a.CumulativeConsumedKwh),
-            neighbourhood.AllAssets().Sum(a => a.CumulativeGeneratedKwh));
+            neighbourhood.AllAssets().Sum(a => a.CumulativeGeneratedKwh),
+            latest?.NetLoadWithoutBatteryKw ?? 0,
+            latest?.NetLoadWithBatteryKw ?? 0,
+            latest?.BatteryPowerKw ?? 0,
+            soc,
+            capacity,
+            capacity > 0 ? soc / capacity * 100 : 0,
+            _config.BatteryDischargeThresholdKw,
+            _config.BatteryChargeThresholdKw);
     }
 
     public async Task<AggregateHistoryResponse> GetAggregateHistoryAsync(
@@ -77,7 +90,9 @@ public sealed class NeighbourhoodQueryService : INeighbourhoodQueryService
         var dtos = points.Select(p => new AggregatePointDto(
             p.At, p.Season.ToString(), p.TemperatureCelsius,
             p.TotalConsumptionKw, p.TotalGenerationKw, p.NetKw,
-            p.CumulativeConsumedKwh, p.CumulativeGeneratedKwh)).ToList();
+            p.CumulativeConsumedKwh, p.CumulativeGeneratedKwh,
+            p.NetLoadWithoutBatteryKw, p.NetLoadWithBatteryKw,
+            p.BatteryPowerKw, p.BatterySocKwh)).ToList();
         return new AggregateHistoryResponse(dtos.Count, dtos);
     }
 

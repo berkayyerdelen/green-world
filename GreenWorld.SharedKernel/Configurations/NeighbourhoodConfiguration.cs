@@ -33,4 +33,19 @@ public sealed class NeighbourhoodConfiguration
     public int StepMinutes { get; set; } = 60;
 
     public TimeSpan Step => TimeSpan.FromMinutes(StepMinutes);
+
+    // ---- Neighbourhood battery (peak shaving) ----
+    public double BatteryCapacityKwh { get; set; } = 300;
+    public double BatteryMaxChargeKw { get; set; } = 80;
+    public double BatteryMaxDischargeKw { get; set; } = 80;
+    public double BatteryRoundTripEfficiency { get; set; } = 0.90;
+
+    /// <summary>Discharge when neighbourhood grid load exceeds this (kW).</summary>
+    public double BatteryDischargeThresholdKw { get; set; } = 45;
+
+    /// <summary>Charge when grid load falls below this (kW), incl. PV export.</summary>
+    public double BatteryChargeThresholdKw { get; set; } = 20;
+
+    /// <summary>Initial state of charge as a fraction of capacity [0,1].</summary>
+    public double BatteryInitialSocFraction { get; set; } = 0.5;
 }

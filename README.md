@@ -157,6 +157,26 @@ import. Inter-house trading and storage are not modelled — surplus/deficit is
 aggregated across the neighbourhood, enough to show net import/export across a day
 and the seasons.
 
+### Neighbourhood battery & peak shaving
+A single neighbourhood-scale `Battery` (capacity kWh, max charge/discharge kW,
+round-trip efficiency, state of charge) sits at the aggregate level. Each tick a
+pure `PeakShavingStrategy` looks at the neighbourhood **grid load**
+(consumption − generation) and decides a signed battery power:
+
+- **Grid load above the discharge threshold** → discharge just enough to pull load
+  back toward the threshold (capped by max power and available SoC).
+- **Grid load below the charge threshold** (low demand or PV export) → charge
+  toward the threshold (capped by max power and headroom).
+- **In between** → idle (dead-band).
+
+Round-trip losses are split evenly (one-way efficiency = √round-trip): charging
+stores `energy × η`, discharging draws `energy ÷ η` from storage. The snapshot
+records battery power, SoC, and **net load with battery** = grid load − battery
+discharge, so the UI can compare net load **with vs without** the battery and show
+the **peak reduced** (max load without − max load with) over the visible window.
+The strategy is unit-tested (shave-to-threshold, power cap, charge-when-low,
+dead-band idle, empty battery can't discharge, SoC accounting, efficiency loss).
+
 ## Configuration (code + file)
 The neighbourhood is fully determined by `NeighbourhoodConfiguration`: a fixed
 **seed** plus stated **proportions**. `NeighbourhoodConfigurationLoader` starts
@@ -176,6 +196,11 @@ Defaults (guaranteed **exactly 30 households** and **exactly 6 public facilities
 | Seed | 42 |
 | Start | 2025-01-01T00:00Z |
 | Step | 60 min |
+| Battery capacity | 300 kWh |
+| Battery max charge/discharge | 80 kW |
+| Battery round-trip efficiency | 90% |
+| Discharge / charge thresholds | 45 / 20 kW |
+| Battery initial SoC | 50% |
 
 Assets are assigned by independent seeded draws against the shares, so a given
 seed + config always builds the identical neighbourhood (identities included).

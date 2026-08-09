@@ -91,7 +91,10 @@ public partial class InitialCreate : Migration
                 TotalConsumptionKw = table.Column<double>(type: "double precision", nullable: false),
                 TotalGenerationKw = table.Column<double>(type: "double precision", nullable: false),
                 CumulativeConsumedKwh = table.Column<double>(type: "double precision", nullable: false),
-                CumulativeGeneratedKwh = table.Column<double>(type: "double precision", nullable: false)
+                CumulativeGeneratedKwh = table.Column<double>(type: "double precision", nullable: false),
+                BatteryPowerKw = table.Column<double>(type: "double precision", nullable: false),
+                BatterySocKwh = table.Column<double>(type: "double precision", nullable: false),
+                NetLoadWithBatteryKw = table.Column<double>(type: "double precision", nullable: false)
             },
             constraints: table => table.PrimaryKey("PK_neighbourhood_aggregate_snapshots", x => x.Id));
 

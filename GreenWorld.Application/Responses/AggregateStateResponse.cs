@@ -11,4 +11,13 @@ public sealed record AggregateStateResponse(
     double TotalGenerationKw,
     double NetKw,
     double CumulativeConsumedKwh,
-    double CumulativeGeneratedKwh);
+    double CumulativeGeneratedKwh,
+    // Battery / peak shaving
+    double NetLoadWithoutBatteryKw,
+    double NetLoadWithBatteryKw,
+    double BatteryPowerKw,
+    double BatterySocKwh,
+    double BatteryCapacityKwh,
+    double BatterySocPercent,
+    double BatteryDischargeThresholdKw,
+    double BatteryChargeThresholdKw);

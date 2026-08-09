@@ -34,10 +34,13 @@ partial class GreenWorldDbContextModelSnapshot : ModelSnapshot
         {
             b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
             b.Property<DateTimeOffset>("At").HasColumnType("timestamp with time zone");
+            b.Property<double>("BatteryPowerKw").HasColumnType("double precision");
+            b.Property<double>("BatterySocKwh").HasColumnType("double precision");
             b.Property<double>("CloudCover").HasColumnType("double precision");
             b.Property<double>("CumulativeConsumedKwh").HasColumnType("double precision");
             b.Property<double>("CumulativeGeneratedKwh").HasColumnType("double precision");
             b.Property<double>("IrradianceFactor").HasColumnType("double precision");
+            b.Property<double>("NetLoadWithBatteryKw").HasColumnType("double precision");
             b.Property<Guid>("NeighbourhoodId").HasColumnType("uuid");
             b.Property<string>("Season").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
             b.Property<double>("TemperatureCelsius").HasColumnType("double precision");

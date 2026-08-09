@@ -17,7 +17,7 @@
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
   .kpi .label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
   .kpi .val { font-size:26px; font-weight:650; margin-top:4px; }
-  .val.cons{color:var(--cons)} .val.gen{color:var(--gen)} .val.net{color:var(--net)}
+  .val.cons{color:var(--cons)} .val.gen{color:var(--gen)} .val.net{color:var(--net)} .val.bat{color:#ffd43b}
   .chart-wrap { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:20px; height:340px; }
   table { width:100%; border-collapse:collapse; }
   th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); }
@@ -57,6 +57,9 @@
     <div class="card kpi"><div class="label">Net</div><div class="val net" id="k-net">—</div></div>
     <div class="card kpi"><div class="label">Cumulative consumed</div><div class="val" id="k-cc">—</div></div>
     <div class="card kpi"><div class="label">Cumulative generated</div><div class="val" id="k-cg">—</div></div>
+    <div class="card kpi"><div class="label">Battery power</div><div class="val bat" id="k-bat">—</div></div>
+    <div class="card kpi"><div class="label">Battery SoC</div><div class="val bat" id="k-soc">—</div></div>
+    <div class="card kpi"><div class="label">Peak reduced (window)</div><div class="val" id="k-peak">—</div></div>
   </div>
 
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -69,6 +72,12 @@
     </div>
   </div>
   <div class="chart-wrap"><canvas id="chart"></canvas></div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px">
+    <strong>Peak shaving — net neighbourhood load with vs without battery</strong>
+    <span class="pill" id="peak-note">—</span>
+  </div>
+  <div class="chart-wrap"><canvas id="chart2"></canvas></div>
 
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -97,6 +106,22 @@ const chart = new Chart(ctx, {
   options: { responsive:true, maintainAspectRatio:false, animation:false,
     scales:{ x:{ ticks:{color:'#8aa0b2',maxTicksLimit:8}, grid:{color:'#243444'} },
              y:{ ticks:{color:'#8aa0b2'}, grid:{color:'#243444'} } },
+    plugins:{ legend:{ labels:{ color:'#e7eef5' } } } }
+});
+
+// Peak-shaving chart: net load with vs without battery (left axis) + SoC (right axis).
+const chart2 = new Chart(document.getElementById('chart2'), {
+  type: 'line',
+  data: { labels: [], datasets: [
+    { label:'Net load — no battery kW', data:[], yAxisID:'y', borderColor:'#ff6b6b', backgroundColor:'rgba(255,107,107,.10)', fill:true, tension:.25, pointRadius:0 },
+    { label:'Net load — with battery kW', data:[], yAxisID:'y', borderColor:'#4dabf7', backgroundColor:'rgba(77,171,247,.10)', fill:true, tension:.25, pointRadius:0 },
+    { label:'Discharge threshold', data:[], yAxisID:'y', borderColor:'#8aa0b2', borderDash:[6,4], pointRadius:0, fill:false },
+    { label:'Battery SoC %', data:[], yAxisID:'y1', borderColor:'#ffd43b', backgroundColor:'transparent', tension:.25, pointRadius:0 },
+  ]},
+  options: { responsive:true, maintainAspectRatio:false, animation:false,
+    scales:{ x:{ ticks:{color:'#8aa0b2',maxTicksLimit:8}, grid:{color:'#243444'} },
+             y:{ position:'left', title:{display:true,text:'kW',color:'#8aa0b2'}, ticks:{color:'#8aa0b2'}, grid:{color:'#243444'} },
+             y1:{ position:'right', min:0, max:100, title:{display:true,text:'SoC %',color:'#8aa0b2'}, ticks:{color:'#8aa0b2'}, grid:{drawOnChartArea:false} } },
     plugins:{ legend:{ labels:{ color:'#e7eef5' } } } }
 });
 
@@ -133,11 +158,36 @@ async function tick(){
     document.getElementById('k-cc').textContent   = fmt(agg.cumulativeConsumedKwh,1)+' kWh';
     document.getElementById('k-cg').textContent   = fmt(agg.cumulativeGeneratedKwh,1)+' kWh';
 
-    chart.data.labels = hist.points.map(p => new Date(p.at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit'}));
+    const bp = agg.batteryPowerKw;
+    const mode = bp > 0.01 ? 'discharging' : bp < -0.01 ? 'charging' : 'idle';
+    document.getElementById('k-bat').textContent = `${fmt(Math.abs(bp))} kW ${mode}`;
+    document.getElementById('k-soc').textContent = `${fmt(agg.batterySocPercent,0)}% · ${fmt(agg.batterySocKwh,0)}/${fmt(agg.batteryCapacityKwh,0)} kWh`;
+
+    const labels = hist.points.map(p => new Date(p.at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit'}));
+    chart.data.labels = labels;
     chart.data.datasets[0].data = hist.points.map(p => p.totalConsumptionKw);
     chart.data.datasets[1].data = hist.points.map(p => p.totalGenerationKw);
     chart.data.datasets[2].data = hist.points.map(p => p.netKw);
     chart.update();
+
+    // Peak-shaving chart + "peak reduced" over the visible window.
+    const without = hist.points.map(p => p.netLoadWithoutBatteryKw);
+    const withBat = hist.points.map(p => p.netLoadWithBatteryKw);
+    const socPct  = hist.points.map(p => agg.batteryCapacityKwh > 0 ? p.batterySocKwh / agg.batteryCapacityKwh * 100 : 0);
+    chart2.data.labels = labels;
+    chart2.data.datasets[0].data = without;
+    chart2.data.datasets[1].data = withBat;
+    chart2.data.datasets[2].data = labels.map(() => agg.batteryDischargeThresholdKw);
+    chart2.data.datasets[3].data = socPct;
+    chart2.update();
+
+    const peakNo = without.length ? Math.max(...without) : 0;
+    const peakWith = withBat.length ? Math.max(...withBat) : 0;
+    const reduced = peakNo - peakWith;
+    const pct = peakNo > 0 ? (reduced / peakNo * 100) : 0;
+    document.getElementById('k-peak').textContent = `${fmt(reduced)} kW`;
+    document.getElementById('peak-note').textContent =
+      `peak ${fmt(peakNo)} → ${fmt(peakWith)} kW  (−${fmt(pct,0)}%) · threshold ${fmt(agg.batteryDischargeThresholdKw,0)} kW`;
 
     document.getElementById('meter-count').textContent =
       `${meters.meters.length} meters · Σ ${fmt(meters.totalConsumedKwh,1)} consumed / ${fmt(meters.totalGeneratedKwh,1)} generated kWh`;

@@ -1,6 +1,7 @@
 using GreenWorld.Application.Contracts;
 using GreenWorld.Application.Messaging;
 using GreenWorld.Domain.Models;
+using GreenWorld.Domain.Models.Storage;
 using GreenWorld.Domain.Policies.Contracts;
 using GreenWorld.Domain.Repositories;
 using GreenWorld.Domain.Services;
@@ -25,6 +26,7 @@ public sealed class MeterSimulatorService : BackgroundService
     private readonly IMeterReadingPublisher _publisher;
     private readonly IWeatherModel _weather;
     private readonly MeterReadingCalculator _calculator;
+    private readonly PeakShavingStrategy _peakShaving;
     private readonly NeighbourhoodConfiguration _config;
     private readonly SimulatorOptions _options;
     private readonly ISimulationControl _control;
@@ -35,6 +37,7 @@ public sealed class MeterSimulatorService : BackgroundService
         IMeterReadingPublisher publisher,
         IWeatherModel weather,
         MeterReadingCalculator calculator,
+        PeakShavingStrategy peakShaving,
         NeighbourhoodConfiguration config,
         IOptions<SimulatorOptions> options,
         ISimulationControl control,
@@ -44,6 +47,7 @@ public sealed class MeterSimulatorService : BackgroundService
         _publisher = publisher;
         _weather = weather;
         _calculator = calculator;
+        _peakShaving = peakShaving;
         _config = config;
         _options = options.Value;
         _control = control;
@@ -69,6 +73,10 @@ public sealed class MeterSimulatorService : BackgroundService
 
         var assets = neighbourhood.AllAssets().ToList();
         var clock = new SimulationClock(_config.StartUtc, _config.Step);
+        var battery = new Battery(
+            _config.BatteryCapacityKwh, _config.BatteryMaxChargeKw, _config.BatteryMaxDischargeKw,
+            _config.BatteryRoundTripEfficiency,
+            _config.BatteryInitialSocFraction * _config.BatteryCapacityKwh);
         double cumulativeConsumed = 0, cumulativeGenerated = 0;
         var step = 0;
 
@@ -103,10 +111,19 @@ public sealed class MeterSimulatorService : BackgroundService
 
             cumulativeConsumed += tickConsumptionKw * ctx.StepHours;
             cumulativeGenerated += tickGenerationKw * ctx.StepHours;
+
+            // Peak shaving: decide battery power from the grid load, then apply it.
+            var gridLoadKw = tickConsumptionKw - tickGenerationKw;
+            var batteryPowerKw = _peakShaving.Decide(battery, gridLoadKw,
+                _config.BatteryDischargeThresholdKw, _config.BatteryChargeThresholdKw, ctx.StepHours);
+            battery.Apply(batteryPowerKw, ctx.StepHours);
+            var netLoadWithBatteryKw = gridLoadKw - batteryPowerKw;
+
             await WriteSnapshotAsync(new NeighbourhoodAggregateSnapshot(
                 Guid.NewGuid(), neighbourhood.Id, now,
                 ctx.Season, ctx.Weather.TemperatureCelsius, ctx.Weather.CloudCover, ctx.Weather.IrradianceFactor,
-                tickConsumptionKw, tickGenerationKw, cumulativeConsumed, cumulativeGenerated),
+                tickConsumptionKw, tickGenerationKw, cumulativeConsumed, cumulativeGenerated,
+                batteryPowerKw, battery.SocKwh, netLoadWithBatteryKw),
                 stoppingToken);
 
             clock.Advance();

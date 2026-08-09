@@ -47,7 +47,7 @@ public static class DependencyInjection
              .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
 
         // Repositories / stores.
-        services.AddScoped<INeighbourhoodRepository, EfNeighbourhoodRepository>();
+        services.AddScoped<INeighbourhoodRepository, NeighbourhoodRepository>();
         services.AddScoped<IAssetRepository, EfAssetRepository>();
         services.AddScoped<IMeterReadingEventStore, EfMeterReadingEventStore>();
         services.AddScoped<INeighbourhoodAggregateStore, EfNeighbourhoodAggregateStore>();
@@ -55,6 +55,7 @@ public static class DependencyInjection
 
         // Deterministic domain services.
         services.AddSingleton<MeterReadingCalculator>();
+        services.AddSingleton<PeakShavingStrategy>();
         services.AddSingleton<IWeatherModel>(_ => new SeasonalWeatherModel(neighbourhoodConfig.Seed));
 
         // Messaging: MassTransit over RabbitMQ.

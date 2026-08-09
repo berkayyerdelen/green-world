@@ -22,12 +22,20 @@ public sealed class NeighbourhoodAggregateSnapshot
     public double CumulativeConsumedKwh { get; private set; }
     public double CumulativeGeneratedKwh { get; private set; }
 
+    // Battery / peak shaving. BatteryPowerKw is signed: + discharging, − charging.
+    public double BatteryPowerKw { get; private set; }
+    public double BatterySocKwh { get; private set; }
+
+    /// <summary>Grid load after the battery acts (consumption − generation − battery discharge).</summary>
+    public double NetLoadWithBatteryKw { get; private set; }
+
     private NeighbourhoodAggregateSnapshot() { } // EF
 
     public NeighbourhoodAggregateSnapshot(Guid id, Guid neighbourhoodId, DateTimeOffset at,
         Season season, double temperatureCelsius, double cloudCover, double irradianceFactor,
         double totalConsumptionKw, double totalGenerationKw,
-        double cumulativeConsumedKwh, double cumulativeGeneratedKwh)
+        double cumulativeConsumedKwh, double cumulativeGeneratedKwh,
+        double batteryPowerKw, double batterySocKwh, double netLoadWithBatteryKw)
     {
         Id = id;
         NeighbourhoodId = neighbourhoodId;
@@ -40,7 +48,13 @@ public sealed class NeighbourhoodAggregateSnapshot
         TotalGenerationKw = totalGenerationKw;
         CumulativeConsumedKwh = cumulativeConsumedKwh;
         CumulativeGeneratedKwh = cumulativeGeneratedKwh;
+        BatteryPowerKw = batteryPowerKw;
+        BatterySocKwh = batterySocKwh;
+        NetLoadWithBatteryKw = netLoadWithBatteryKw;
     }
 
     public double NetKw => TotalGenerationKw - TotalConsumptionKw;
+
+    /// <summary>Grid load before the battery acts (consumption − generation).</summary>
+    public double NetLoadWithoutBatteryKw => TotalConsumptionKw - TotalGenerationKw;
 }

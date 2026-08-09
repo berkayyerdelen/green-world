@@ -5,10 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GreenWorld.Infrastructure.Repositories;
 
-public sealed class EfNeighbourhoodRepository : INeighbourhoodRepository
+public sealed class NeighbourhoodRepository : INeighbourhoodRepository
 {
     private readonly GreenWorldDbContext _db;
-    public EfNeighbourhoodRepository(GreenWorldDbContext db) => _db = db;
+    public NeighbourhoodRepository(GreenWorldDbContext db) => _db = db;
 
     public Task<bool> ExistsAnyAsync(CancellationToken ct = default)
         => _db.Neighbourhoods.AnyAsync(ct);

@@ -10,5 +10,12 @@
   "HomeEvPowerKw": 7.4,
   "PublicChargerPowerKw": 22.0,
   "StartUtc": "2025-01-01T00:00:00+00:00",
-  "StepMinutes": 60
+  "StepMinutes": 60,
+  "BatteryCapacityKwh": 300,
+  "BatteryMaxChargeKw": 80,
+  "BatteryMaxDischargeKw": 80,
+  "BatteryRoundTripEfficiency": 0.90,
+  "BatteryDischargeThresholdKw": 45,
+  "BatteryChargeThresholdKw": 20,
+  "BatteryInitialSocFraction": 0.5
 }

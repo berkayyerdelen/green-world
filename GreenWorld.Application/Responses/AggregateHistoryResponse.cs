@@ -8,6 +8,10 @@ public sealed record AggregatePointDto(
     double TotalGenerationKw,
     double NetKw,
     double CumulativeConsumedKwh,
-    double CumulativeGeneratedKwh);
+    double CumulativeGeneratedKwh,
+    double NetLoadWithoutBatteryKw,
+    double NetLoadWithBatteryKw,
+    double BatteryPowerKw,
+    double BatterySocKwh);
 
 public sealed record AggregateHistoryResponse(int Count, IReadOnlyList<AggregatePointDto> Points);
